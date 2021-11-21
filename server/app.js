@@ -3,6 +3,7 @@ const mongoose=require('mongoose')
 const dotenv=require('dotenv')
 const cors=require('cors')
 const bodyParser=require("body-parser")
+const fileupload = require('./middleware/file-uploads')
 dotenv.config()
 
 const app=express()
@@ -14,17 +15,23 @@ const corsOptions ={
 
  app.use(cors(corsOptions))
  app.use(bodyParser.json())
+ app.use("/auth", require('./routers/userRouter'))
  app.use('/uploads/images',express.static("uploads/images"))   //to make images available public
 
  //connect to db
 const MongoClient = require('mongodb').MongoClient
+const { MongoDBNamespace } = require('mongodb')
 const connectionString='mongodb+srv://tanvi:tanvi123@cluster0.vklun.mongodb.net/myFirstDatabase?retryWrites=true&w=majority'
 MongoClient.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true})
   .then(client => {
-    console.log('Connected to Database')
+    
     const db = client.db('Online-Course-Management')
     const courseCollection=db.collection('courses')
+    const courseEnrolledCollection = db.collection("course-enrolled")
+    console.log('Connected to Database')
 
+    //routers
+    //get the course details(student)
     app.get('/',async (req,res)=>{
     const data = await courseCollection.find()
     data.toArray((err,items)=>{
@@ -32,6 +39,7 @@ MongoClient.connect(connectionString, { useNewUrlParser: true, useUnifiedTopolog
     })
     })
 
+    //add courses(admin)
     app.post('/add-course',(req,res)=>{
       courseCollection.insertOne(req.body)
       .then(
@@ -39,6 +47,45 @@ MongoClient.connect(connectionString, { useNewUrlParser: true, useUnifiedTopolog
       )
       .catch(error=>console.log(error)) 
     })
+
+    //enroll in course(student)
+      app.post('/enroll-course',(req,res)=>{
+      courseEnrolledCollection.insertOne(req.body)
+      res.status(200).json("Enrolled Successfully")
+    })
+
+    //get enrolled courses info(admin)
+    app.get("/course-info",async (req,res)=>{
+      const data = await courseEnrolledCollection.find()
+      data.toArray((err,items)=>{
+      return res.json(items)
+    })
+    })
+
+    //delete a course (admin)
+    app.delete("/delete-course/:id",async(req,res)=>{
+      try{
+      courseCollection.deleteOne(
+        {_id:new mongodb.ObjectId(req.params.id)},
+        res.status(200).json("deleted successfully")
+      )
+      }catch(err){
+        res.status(400).json("unable to delete, something went wrong")
+      }
+    })
+
+    //update a course (admin)
+    app.put('/update-course/:id',async (req, res)=>{
+      try{
+      courseCollection.findOneAndUpdate(
+        { _id: new mongodb.ObjectId(req.params.id) },
+        { $set: {name:req.body.name} },
+          res.status(200).json('Success updated!')
+      )
+      }catch(err){
+        res.status(400).json("unable to update, something went wrong")
+      }
+      })
   })
 .catch(error=>console.log(error))
 const PORT=process.env.PORT || 5000;
