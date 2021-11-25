@@ -4,6 +4,8 @@ const dotenv=require('dotenv')
 const cors=require('cors')
 const bodyParser=require("body-parser")
 const fileupload = require('./middleware/file-uploads')
+const checkAuth = require('./middleware/check-auth')
+
 dotenv.config()
 
 const app=express()
@@ -38,21 +40,29 @@ MongoClient.connect(connectionString, { useNewUrlParser: true, useUnifiedTopolog
       return res.json(items)
     })
     })
+    //enroll in course(student)
+      app.post('/enroll-course',(req,res)=>{
+      courseEnrolledCollection.insertOne(req.body)
+      res.status(200).json("Enrolled Successfully")
+    })
+
+    app.use(checkAuth)
 
     //add courses(admin)
-    app.post('/add-course',(req,res)=>{
-      courseCollection.insertOne(req.body)
+    app.post('/add-course',fileupload.single("courseImage"),(req,res)=>{
+
+      const newCourse={
+        ...req.body,
+        courseImage:req.file.path
+      }
+      courseCollection.insertOne(newCourse)
       .then(
         res.status(200).send("Added")
       )
       .catch(error=>console.log(error)) 
     })
 
-    //enroll in course(student)
-      app.post('/enroll-course',(req,res)=>{
-      courseEnrolledCollection.insertOne(req.body)
-      res.status(200).json("Enrolled Successfully")
-    })
+    
 
     //get enrolled courses info(admin)
     app.get("/course-info",async (req,res)=>{
